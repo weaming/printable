@@ -1,6 +1,11 @@
 import json
 import sys
 import string
+import subprocess
+
+from data_process.io_json import read_json
+from data_process.io_csv import read_csv
+from data_process.io_yaml import read_yaml, save_yaml
 
 GRID_TOP = "┌┬┐"
 GRID_MID = "├┼┤"
@@ -26,6 +31,9 @@ def get_text_width(text):
     """get the print width of text accordding to whether it's printable ascii except the blank ' '"""
     if not text:
         return 0
+
+    # parse to string
+    text = str(text)
 
     assert not any(
         x in string.whitespace for x in text.replace(" ", "-")
@@ -191,6 +199,41 @@ def readable(
     )
 
 
+def read_from_yaml_csv_json(path):
+    try:
+        return read_yaml(path)
+    except Exception as e:
+        pass
+
+    try:
+        return read_csv(path)
+    except Exception as e:
+        pass
+
+    try:
+        return read_json(path)
+    except Exception as e:
+        pass
+
+    raise Exception("read from {} as yaml, csv, json all failed".format(path))
+
+
+def write_to_less(text, line_numbers):
+    less_cmd = ["less", "-S"]
+    if line_numbers:
+        less_cmd.append("-N")
+
+    p = subprocess.Popen(less_cmd, stdin=subprocess.PIPE)
+
+    try:
+        p.stdin.write(text.encode("utf-8"))
+    except BrokenPipeError as e:
+        print(e)
+        sys.exit(1)
+
+    p.communicate()
+
+
 def main():
     import argparse
 
@@ -205,18 +248,27 @@ def main():
     parser.add_argument(
         "--grid", default=None, choices=["odd", "even"], help="whether print the grid"
     )
+    parser.add_argument(
+        "--less", default=False, action="store_true", help="use less to view the output"
+    )
+    parser.add_argument(
+        "-N",
+        "--line-numbers",
+        default=True,
+        action="store_false",
+        help="print line numbers when using less",
+    )
     args = parser.parse_args()
 
     try:
-        with open(args.file) as f:
-            print(
-                readable(
-                    json.load(f),
-                    col_sep=args.sep_col,
-                    row_sep=args.sep_row,
-                    grid=args.grid,
-                )
-            )
+        data = read_from_yaml_csv_json(args.file)
+        output = readable(
+            data, col_sep=args.sep_col, row_sep=args.sep_row, grid=args.grid
+        )
+        if args.less:
+            write_to_less(output, line_numbers=args.line_numbers)
+        else:
+            print(output)
     except Exception as e:
         print(e)
         sys.exit(1)

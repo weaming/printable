@@ -8,3 +8,6 @@ venv
 
 *.swp
 *.json
+*.csv
+*.yml
+*.yaml
