@@ -77,7 +77,7 @@ def change_based_on_is_grid_index(grid, origin, wanted, index):
     return origin
 
 
-def readble(
+def readable(
     data: dict,
     headers=None,
     grid=False,
@@ -169,7 +169,7 @@ def main():
     try:
         with open(args.file) as f:
             print(
-                readble(
+                readable(
                     json.load(f),
                     col_sep=args.sep_col,
                     row_sep=args.sep_row,
