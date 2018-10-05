@@ -27,7 +27,7 @@ def get_text_width(text):
     if not text:
         return 0
 
-    assert not all(
+    assert not any(
         x in string.whitespace for x in text.replace(" ", "-")
     ), "text should not contains whitespace: '{}'".format(text)
 
