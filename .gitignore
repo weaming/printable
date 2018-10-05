@@ -1,0 +1,10 @@
+*.py[cod]
+build/
+dist/
+*.egg-info/
+
+venv/
+venv
+
+*.swp
+*.json
