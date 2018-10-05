@@ -80,7 +80,7 @@ def change_based_on_is_grid_index(grid, origin, wanted, index):
 def readable(
     data: dict,
     headers=None,
-    grid=False,
+    grid=None,
     col_sep="  ",
     row_sep=None,
     prefix=" ",
