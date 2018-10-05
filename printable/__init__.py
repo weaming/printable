@@ -5,6 +5,8 @@ import string
 CROSS = "┼"
 ROW = "─"
 COL = "│"
+ROW_TOP = "┬"
+ROW_BOTTOM = "┴"
 
 
 def get_text_width(text):
@@ -30,6 +32,7 @@ def get_text_width(text):
 
 def get_max_width(data):
     """get the maximum widths of every columns"""
+
     def _set(lst, index, x):
         if len(lst) < index + 1:
             lst += [None] * (index + 1 - len(lst))
@@ -61,7 +64,11 @@ def table_print_row(lst, max_width_list, prefix=" ", suffix=" "):
 
 def change_based_on_is_grid_index(grid, origin, wanted, index):
     """if current index is grid, print the wanted text except of the origin separator"""
-    assert grid in (None, "odd", "even")
+    assert grid in (
+        None,
+        "odd",
+        "even",
+    ), 'grid must be in [None, "odd", "even"], got {}'.format(grid)
     if grid:
         if grid == "odd" and index % 2 == 1:
             return wanted
@@ -73,24 +80,34 @@ def change_based_on_is_grid_index(grid, origin, wanted, index):
 def readble(
     data: dict,
     headers=None,
+    grid=False,
     col_sep="  ",
     row_sep=None,
-    grid=False,
     prefix=" ",
     suffix=" ",
 ):
     """return the printable text of a list of dict"""
     if not grid:
         col_sep = row_sep = ""
-    else:
-        grid = "odd"
 
     def _get_x_fix(grid, fix, index):
-        assert grid in (None, "odd", "even")
+        assert grid in (
+            None,
+            "odd",
+            "even",
+        ), 'grid must be in [None, "odd", "even"], got {}'.format(grid)
         return change_based_on_is_grid_index(grid, fix, "", index)
 
-    def _get_col_sep(grid, sep, index):
-        assert grid in (None, "odd", "even")
+    def _get_col_sep(grid, sep, index, is_edge):
+        assert grid in (
+            None,
+            "odd",
+            "even",
+        ), 'grid must be in [None, "odd", "even"], got {}'.format(grid)
+        if grid == "even" and is_edge:
+            if index == 0:
+                return ROW_TOP
+            return ROW_BOTTOM
         return change_based_on_is_grid_index(grid, sep, CROSS, index)
 
     headers = headers or list(data[0].keys())
@@ -98,23 +115,32 @@ def readble(
     rows = [headers] + data
     max_width_list = get_max_width(rows)
 
-    if row_sep:
+    # add row sep
+    if grid and row_sep:
         row_sep_list = [
             tuple(
                 row_sep * (max_width_list[j] + len(prefix) + len(suffix))
                 for j in range(len(max_width_list))
             )
         ] * len(rows)
+
         final_rows = []
+
         for i, r in enumerate(rows):
-            final_rows.append(r)
-            if i < len(rows) - 1:
+            if grid == "odd":
+                final_rows.append(r)
+                if i < len(rows) - 1:
+                    final_rows.append(row_sep_list[i])
+            elif grid == "even":
                 final_rows.append(row_sep_list[i])
+                final_rows.append(r)
+                if i == len(rows) - 1:
+                    final_rows.append(row_sep_list[i])
     else:
         final_rows = rows
 
     return "\n".join(
-        _get_col_sep(grid, col_sep, i).join(
+        _get_col_sep(grid, col_sep, i, is_edge=i in [0, len(final_rows) - 1]).join(
             table_print_row(
                 r,
                 max_width_list,
@@ -136,7 +162,7 @@ def main():
     )
     parser.add_argument("--sep-row", default=ROW, help="the sepatrator of rows, e.g. ─")
     parser.add_argument(
-        "--grid", default=False, action="store_true", help="whether print the grid"
+        "--grid", default=None, choices=["odd", "even"], help="whether print the grid"
     )
     args = parser.parse_args()
 

@@ -1,3 +1,3 @@
 # Printable
 
-Functions help for print tabular data.
+Functions help for printing tabular data.
