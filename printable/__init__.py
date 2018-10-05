@@ -90,9 +90,9 @@ def change_based_on_is_grid_index(grid, origin, wanted, index):
     """if current index is grid, print the wanted text except of the origin separator"""
     _check_grid(grid)
     if grid:
-        if grid == "odd" and index % 2 == 1:
+        if grid == "inner" and index % 2 == 1:
             return wanted
-        if grid == "even" and index % 2 == 0:
+        if grid == "full" and index % 2 == 0:
             return wanted
     return origin
 
@@ -100,9 +100,9 @@ def change_based_on_is_grid_index(grid, origin, wanted, index):
 def _check_grid(grid):
     assert grid in (
         None,
-        "odd",
-        "even",
-    ), 'grid must be in [None, "odd", "even"], got {}'.format(grid)
+        "inner",
+        "full",
+    ), 'grid must be in [None, "inner", "full"], got {}'.format(grid)
 
 
 def _get_cell_prefix_or_suffix(grid, fix, index):
@@ -112,7 +112,7 @@ def _get_cell_prefix_or_suffix(grid, fix, index):
 
 def _get_row_sep(grid, sep, index, is_edge):
     _check_grid(grid)
-    if grid == "even" and is_edge:
+    if grid == "full" and is_edge:
         if index == 0:
             return ROW_TOP
         return ROW_BOTTOM
@@ -124,7 +124,7 @@ def _get_row_grid_edge(grid, row_index, col_index, is_row_edge):
     return the symbol for the left and right table line
     """
     _check_grid(grid)
-    if grid == "even":
+    if grid == "full":
         if is_row_edge:
             if row_index == 0:
                 if col_index == 0:
@@ -173,11 +173,11 @@ def readable(
         final_rows = []
 
         for i, r in enumerate(rows):
-            if grid == "odd":
+            if grid == "inner":
                 final_rows.append(r)
                 if i < len(rows) - 1:
                     final_rows.append(grid_row_list[i])
-            elif grid == "even":
+            elif grid == "full":
                 final_rows.append(grid_row_list[i])
                 final_rows.append(r)
                 if i == len(rows) - 1:
@@ -235,7 +235,7 @@ def main():
     parser.add_argument(
         "--grid",
         default=os.getenv("PRINTABLE_GRID", None),
-        choices=["odd", "even"],
+        choices=["inner", "full"],
         help="whether print the grid",
     )
     parser.add_argument(
