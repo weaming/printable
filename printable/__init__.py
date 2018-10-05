@@ -2,6 +2,7 @@ import json
 import sys
 import string
 import subprocess
+import os
 
 from data_process.io_json import read_json
 from data_process.io_csv import read_csv
@@ -246,10 +247,10 @@ def main():
     )
     parser.add_argument("--sep-row", default=ROW, help="the sepatrator of rows, e.g. ─")
     parser.add_argument(
-        "--grid", default=None, choices=["odd", "even"], help="whether print the grid"
+        "--grid", default=os.getenv("PRINTABLE_GRID", None), choices=["odd", "even"], help="whether print the grid"
     )
     parser.add_argument(
-        "--less", default=False, action="store_true", help="use less to view the output"
+        "--less", default=os.getenv("PRINTABLE_LESS", False), action="store_true", help="use less to view the output"
     )
     parser.add_argument(
         "-N",
