@@ -8,6 +8,11 @@ Functions help for printing tabular data.
 
 ## Usage Example
 
+```python
+from printable import readable, styles
+print(readable(list_of_dict, **styles['full']))
+```
+
 ```
 $ printable -f x.json
  symbol     desp      last    change   changeper  turnover  changesign  lastupdate

@@ -1,3 +1,9 @@
+"""
+Usage Example:
+
+    from printable import readable, styles
+    readable(list_of_dict, **styles['full'])
+"""
 import json
 import sys
 import string
@@ -39,7 +45,7 @@ def get_text_width(text):
     text = str(text)
 
     assert not any(
-        x in string.whitespace for x in text.replace(" ", "-")
+        x in string.whitespace.replace(" ", "") for x in text
     ), "text should not contains whitespace: '{}'".format(text)
 
     def _width(x):
@@ -141,6 +147,13 @@ def _get_row_grid_edge(grid, row_index, col_index, is_row_edge):
                 grid, COL, COL_LEFT if col_index == 0 else COL_RIGHT, row_index
             )
     return ""
+
+
+styles = {
+    "full": {"grid": "full", "col_sep": COL, "row_sep": ROW},
+    "inner": {"grid": "inner", "col_sep": COL, "row_sep": ROW},
+    "default": {"grid": None, "col_sep": "  ", "row_sep": None},
+}
 
 
 def readable(
