@@ -27,6 +27,8 @@ COL_RIGHT = GRID_MID[2]
 LEFT_BOTTOM = GRID_BOT[0]
 RIGHT_BOTTOM = GRID_BOT[2]
 
+DEBUG = os.getenv("DEBUG")
+
 
 def get_text_width(text):
     """get the print width of text accordding to whether it's printable ascii except the blank ' '"""
@@ -183,6 +185,9 @@ def readable(
     else:
         final_rows = rows
 
+    if DEBUG:
+        print(final_rows)
+
     return "\n".join(
         "{}{}{}".format(
             _get_row_grid_edge(grid, i, 0, i in [0, len(final_rows) - 1]),
@@ -198,25 +203,6 @@ def readable(
         )
         for i, r in enumerate(final_rows)
     )
-
-
-def read_from_yaml_csv_json(path):
-    try:
-        return read_yaml(path)
-    except Exception as e:
-        pass
-
-    try:
-        return read_csv(path)
-    except Exception as e:
-        pass
-
-    try:
-        return read_json(path)
-    except Exception as e:
-        pass
-
-    raise Exception("read from {} as yaml, csv, json all failed".format(path))
 
 
 def write_to_less(text, line_numbers):
@@ -247,10 +233,16 @@ def main():
     )
     parser.add_argument("--sep-row", default=ROW, help="the sepatrator of rows, e.g. ─")
     parser.add_argument(
-        "--grid", default=os.getenv("PRINTABLE_GRID", None), choices=["odd", "even"], help="whether print the grid"
+        "--grid",
+        default=os.getenv("PRINTABLE_GRID", None),
+        choices=["odd", "even"],
+        help="whether print the grid",
     )
     parser.add_argument(
-        "--less", default=os.getenv("PRINTABLE_LESS", False), action="store_true", help="use less to view the output"
+        "--less",
+        default=os.getenv("PRINTABLE_LESS", False),
+        action="store_true",
+        help="use less to view the output",
     )
     parser.add_argument(
         "-N",
@@ -259,10 +251,21 @@ def main():
         action="store_false",
         help="print line numbers when using less",
     )
+    parser.add_argument(
+        "-t",
+        "--type",
+        default="json",
+        choices=["json", "csv", "yaml"],
+        help="the file format",
+    )
     args = parser.parse_args()
 
     try:
-        data = read_from_yaml_csv_json(args.file)
+        data = {"json": read_json, "csv": read_csv, "yaml": read_yaml}[args.type](
+            args.file
+        )
+        if DEBUG:
+            print(data)
         output = readable(
             data, col_sep=args.sep_col, row_sep=args.sep_row, grid=args.grid
         )
