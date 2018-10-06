@@ -38,7 +38,7 @@ DEBUG = os.getenv("DEBUG")
 
 def get_text_width(text):
     """get the print width of text accordding to whether it's printable ascii except the blank ' '"""
-    if not text:
+    if not str(text):
         return 0
 
     # parse to string
