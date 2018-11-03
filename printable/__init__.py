@@ -9,6 +9,7 @@ import sys
 import string
 import subprocess
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 from data_process.io_json import read_json
 from data_process.io_csv import read_csv
@@ -36,6 +37,14 @@ RIGHT_BOTTOM = GRID_BOT[2]
 DEBUG = os.getenv("DEBUG")
 
 single_width_str = string.ascii_letters + string.digits + string.punctuation + " "
+
+executor = ThreadPoolExecutor(30)
+
+
+def map_do(fn, iterable, with_index=False):
+    if with_index:
+        return executor.map(lambda z: fn(*z), enumerate(iterable))
+    return executor.map(fn, iterable)
 
 
 def get_text_width(text):
@@ -84,9 +93,9 @@ def table_print_row(lst, max_width_list, prefix=" ", suffix=" "):
     """just print a row data in the format of list"""
     return [
         "{}{}{}{}".format(
-            prefix, x, " " * (max_width_list[i] - get_text_width(x)), suffix
+            prefix, z[1], " " * (max_width_list[z[0]] - get_text_width(z[1])), suffix
         )
-        for i, x in enumerate(lst)
+        for z in enumerate(lst)
     ]
 
 
@@ -199,8 +208,8 @@ def readable(
     if DEBUG:
         print(final_rows)
 
-    return "\n".join(
-        "{}{}{}".format(
+    def fn(i, r):
+        return "{}{}{}".format(
             _get_row_grid_edge(grid, i, 0, i in [0, len(final_rows) - 1]),
             _get_row_sep(grid, col_sep, i, is_edge=i in [0, len(final_rows) - 1]).join(
                 table_print_row(
@@ -212,8 +221,9 @@ def readable(
             ),
             _get_row_grid_edge(grid, i, 99, i in [0, len(final_rows) - 1]),
         )
-        for i, r in enumerate(final_rows)
-    )
+
+    results = map_do(fn, final_rows, with_index=True)
+    return "\n".join(results)
 
 
 def write_to_less(text, line_numbers):
