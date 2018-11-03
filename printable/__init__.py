@@ -35,6 +35,8 @@ RIGHT_BOTTOM = GRID_BOT[2]
 
 DEBUG = os.getenv("DEBUG")
 
+single_width_str = string.ascii_letters + string.digits + string.punctuation + " "
+
 
 def get_text_width(text):
     """get the print width of text accordding to whether it's printable ascii except the blank ' '"""
@@ -45,7 +47,7 @@ def get_text_width(text):
     text = str(text).replace("\n", " ").replace("\t", " ")
 
     def _width(x):
-        if x in string.ascii_letters + string.digits + string.punctuation + " ":
+        if x in single_width_str:
             return 1
         else:
             return 2
