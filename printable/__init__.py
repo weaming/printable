@@ -42,11 +42,7 @@ def get_text_width(text):
         return 0
 
     # parse to string
-    text = str(text)
-
-    assert not any(
-        x in string.whitespace.replace(" ", "") for x in text
-    ), "text should not contains whitespace: '{}'".format(text)
+    text = str(text).replace("\n", " ").replace("\t", " ")
 
     def _width(x):
         if x in string.ascii_letters + string.digits + string.punctuation + " ":
