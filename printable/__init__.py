@@ -9,7 +9,6 @@ import sys
 import string
 import subprocess
 import os
-from concurrent.futures import ThreadPoolExecutor
 
 from data_process.io_json import read_json
 from data_process.io_csv import read_csv
@@ -38,55 +37,20 @@ DEBUG = os.getenv("DEBUG")
 
 single_width_str = string.ascii_letters + string.digits + string.punctuation + " "
 
-executor = ThreadPoolExecutor(30)
 
-
-def map_do(fn, iterable, with_index=False):
-    if with_index:
-        return executor.map(lambda z: fn(*z), enumerate(iterable))
-    return executor.map(fn, iterable)
+def _width(x):
+    if x in single_width_str:
+        return 1
+    else:
+        return 2
 
 
 def get_text_width(text):
     """get the print width of text accordding to whether it's printable ascii except the blank ' '"""
-    if not str(text):
+    if not text:
         return 0
 
-    # parse to string
-    text = str(text).replace("\n", " ").replace("\t", " ")
-
-    def _width(x):
-        if x in single_width_str:
-            return 1
-        else:
-            return 2
-
-    rv = 0
-    for x in text:
-        rv += _width(x)
-    return rv
-
-
-def get_max_width(data):
-    """get the maximum widths of every columns"""
-
-    def _set(lst, index, x):
-        if len(lst) < index + 1:
-            lst += [None] * (index + 1 - len(lst))
-        lst[index] = x
-        return lst
-
-    def _index(lst, index, default):
-        try:
-            return lst[index]
-        except IndexError:
-            return default
-
-    rv = []
-    for r in data:
-        for i, x in enumerate(r):
-            _set(rv, i, max(get_text_width(x), _index(rv, i, 0)))
-    return rv
+    return sum(map(_width, text))
 
 
 def table_print_row(lst, max_width_list, prefix=" ", suffix=" "):
@@ -177,18 +141,32 @@ def readable(
         col_sep = row_sep = ""
 
     headers = headers or list(data[0].keys())
-    data = [tuple(r[k] for k in headers) for r in data]
+
+    max_width_list = [0] * len(headers)
+
+    def _set_max_width(r):
+        for i, x in enumerate(r):
+            # lock when write for column
+            # with locks[i]:
+            max_width_list[i] = max(get_text_width(x), max_width_list[i])
+
+    def _parse_text(text):
+        # parse to string
+        return str(text).replace("\n", " ").replace("\t", " ")
+
+    def _set_width_and_return_tuple(r):
+        rv = tuple(_parse_text(r[k]) for k in headers)
+        _set_max_width(rv)
+        return rv
+
+    data = [_set_width_and_return_tuple(r) for r in data]
     rows = [headers] + data
-    max_width_list = get_max_width(rows)
 
     # add row lines as data type
     if grid and row_sep:
-        grid_row_list = [
-            tuple(
-                row_sep * (max_width_list[j] + len(prefix) + len(suffix))
-                for j in range(len(max_width_list))
-            )
-        ] * len(rows)
+        grid_row = tuple(
+            row_sep * (w + len(prefix) + len(suffix)) for w in max_width_list
+        )
 
         final_rows = []
 
@@ -196,12 +174,12 @@ def readable(
             if grid == "inner":
                 final_rows.append(r)
                 if i < len(rows) - 1:
-                    final_rows.append(grid_row_list[i])
+                    final_rows.append(grid_row)
             elif grid == "full":
-                final_rows.append(grid_row_list[i])
+                final_rows.append(grid_row)
                 final_rows.append(r)
                 if i == len(rows) - 1:
-                    final_rows.append(grid_row_list[i])
+                    final_rows.append(grid_row)
     else:
         final_rows = rows
 
@@ -219,10 +197,10 @@ def readable(
                     _get_cell_prefix_or_suffix(grid, suffix, i),
                 )
             ),
-            _get_row_grid_edge(grid, i, 99, i in [0, len(final_rows) - 1]),
+            _get_row_grid_edge(grid, i, None, i in [0, len(final_rows) - 1]),
         )
 
-    results = map_do(fn, final_rows, with_index=True)
+    results = [fn(i, r) for i, r in enumerate(final_rows)]
     return "\n".join(results)
 
 
