@@ -156,11 +156,14 @@ def readable(
 
     def _set_width_and_return_tuple(r):
         rv = tuple(_parse_text(r[k]) for k in headers)
-        _set_max_width(rv)
         return rv
 
     data = [_set_width_and_return_tuple(r) for r in data]
     rows = [headers] + data
+
+    # set and update max width for every columns
+    for r in rows:
+        _set_max_width(r)
 
     # add row lines as data type
     if grid and row_sep:
@@ -265,6 +268,7 @@ def main():
         )
         if DEBUG:
             print(data)
+
         output = readable(
             data, col_sep=args.sep_col, row_sep=args.sep_row, grid=args.grid
         )

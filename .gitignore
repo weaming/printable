@@ -1,6 +1,7 @@
 *.py[cod]
 build/
 dist/
+.idea/
 *.egg-info/
 
 venv/
