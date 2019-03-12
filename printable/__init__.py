@@ -7,12 +7,14 @@ Usage Example:
 import json
 import sys
 import string
+import argparse
 import subprocess
 import os
+import math
 
 from data_process.io_json import read_json
 from data_process.io_csv import read_csv
-from data_process.io_yaml import read_yaml, save_yaml
+from data_process.io_yaml import read_yaml, write_yaml
 
 GRID_TOP = "┌┬┐"
 GRID_MID = "├┼┤"
@@ -57,9 +59,9 @@ def table_print_row(lst, max_width_list, prefix=" ", suffix=" "):
     """just print a row data in the format of list"""
     return [
         "{}{}{}{}".format(
-            prefix, z[1], " " * (max_width_list[z[0]] - get_text_width(z[1])), suffix
+            prefix, v, " " * (max_width_list[i] - get_text_width(v)), suffix
         )
-        for z in enumerate(lst)
+        for i, v in enumerate(lst)
     ]
 
 
@@ -135,6 +137,10 @@ def readable(
     row_sep=None,
     prefix=" ",
     suffix=" ",
+    bars: list = None,
+    bar_char="x",
+    bar_width=100,
+    bar_scale="linal",
 ):
     """return the printable text of a list of dict"""
     if not grid:
@@ -143,6 +149,11 @@ def readable(
     headers = headers or list(data[0].keys())
 
     max_width_list = [0] * len(headers)
+    max_value_dict = {k: 0 for k in headers}
+
+    axis_scale_func = {"linal": lambda x: x, "ln": math.log, "log10": math.log10}[
+        bar_scale
+    ]
 
     def _set_max_width(r):
         for i, x in enumerate(r):
@@ -150,13 +161,30 @@ def readable(
             # with locks[i]:
             max_width_list[i] = max(get_text_width(x), max_width_list[i])
 
-    def _parse_text(text):
+    def _set_max_value(r: dict):
+        for k, v in r.items():
+            if k in bars:
+                max_value_dict[k] = max(float(v), max_value_dict[k])
+
+    def _parse_text(text, key=None):
+        # convert numerics to bar graph
+        if key and key in bars:
+            return bar_char * int(
+                axis_scale_func(float(text))
+                / axis_scale_func(max_value_dict[key])
+                * bar_width
+            )
+
         # parse to string
         return str(text).replace("\n", " ").replace("\t", " ")
 
     def _set_width_and_return_tuple(r):
-        rv = tuple(_parse_text(r[k]) for k in headers)
+        rv = tuple(_parse_text(r[k], key=k) for k in headers)
         return rv
+
+    # set and update max value for every numeric columns
+    for r in data:
+        _set_max_value(r)
 
     data = [_set_width_and_return_tuple(r) for r in data]
     rows = [headers] + data
@@ -224,8 +252,6 @@ def write_to_less(text, line_numbers):
 
 
 def main():
-    import argparse
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-f", "--file", default="/dev/stdin", help="the path of JSON file"
@@ -260,17 +286,40 @@ def main():
         choices=["json", "csv", "yaml"],
         help="the file format",
     )
+    parser.add_argument(
+        "-b", "--bar", nargs="*", help="convert numeric fields to bar graphs"
+    )
+    parser.add_argument(
+        "-c", "--bar-char", default="o", help="the basic char of bar graph"
+    )
+    parser.add_argument(
+        "-w", "--bar-width", default=100, type=int, help="the width of bar graph"
+    )
+    parser.add_argument(
+        "-s",
+        "--bar-scale",
+        default="linal",
+        help="the scale of axis in bar graph",
+        choices=["linal", "ln", "log10"],
+    )
     args = parser.parse_args()
 
     try:
-        data = {"json": read_json, "csv": read_csv, "yaml": read_yaml}[args.type](
+        data = {"json": read_json, "csv": read_csv, "yaml": write_yaml}[args.type](
             args.file
         )
         if DEBUG:
             print(data)
 
         output = readable(
-            data, col_sep=args.sep_col, row_sep=args.sep_row, grid=args.grid
+            data,
+            col_sep=args.sep_col,
+            row_sep=args.sep_row,
+            grid=args.grid,
+            bars=args.bar or [],
+            bar_char=args.bar_char,
+            bar_width=args.bar_width,
+            bar_scale=args.bar_scale,
         )
         if args.less:
             write_to_less(output, line_numbers=args.line_numbers)

@@ -27,7 +27,7 @@ gh_repo = "https://github.com/weaming/{}".format(name)
 
 setup(
     name=name,  # Required
-    version="0.2.8",  # Required
+    version="0.3.0",  # Required
     # This is a one-line description or tagline of what your project does.
     description="functions help for print tabular data",  # Required
     long_description=long_description,  # Optional
