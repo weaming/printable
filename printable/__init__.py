@@ -163,12 +163,12 @@ def readable(
 
     def _set_max_value(r: dict):
         for k, v in r.items():
-            if k in bars:
+            if v and k in bars:
                 max_value_dict[k] = max(float(v), max_value_dict[k])
 
     def _parse_text(text, key=None):
         # convert numerics to bar graph
-        if key and key in bars:
+        if text and key and key in bars:
             return bar_char * int(
                 axis_scale_func(float(text))
                 / axis_scale_func(max_value_dict[key])
@@ -326,5 +326,7 @@ def main():
         else:
             print(output)
     except Exception as e:
+        if DEBUG:
+            raise
         print(e)
         sys.exit(1)
