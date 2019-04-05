@@ -4,7 +4,6 @@ Usage Example:
     from printable import readable, styles
     readable(list_of_dict, **styles['full'])
 """
-import json
 import sys
 import string
 import argparse
@@ -14,7 +13,7 @@ import math
 
 from data_process.io_json import read_json
 from data_process.io_csv import read_csv
-from data_process.io_yaml import read_yaml, write_yaml
+from data_process.io_yaml import read_yaml
 
 GRID_TOP = "┌┬┐"
 GRID_MID = "├┼┤"
@@ -60,8 +59,7 @@ def table_print_row(lst, max_width_list, prefix=" ", suffix=" "):
     return [
         "{}{}{}{}".format(
             prefix, v, " " * (max_width_list[i] - get_text_width(v)), suffix
-        )
-        for i, v in enumerate(lst)
+        ) for i, v in enumerate(lst)
     ]
 
 
@@ -81,11 +79,17 @@ def _check_grid(grid):
         None,
         "inner",
         "full",
-    ), 'grid must be in [None, "inner", "full"], got {}'.format(grid)
+        "markdown",
+    ), 'grid must be in [None, "inner", "full", "markdown"], got {}'.format(
+        grid
+    )
 
 
 def _get_cell_prefix_or_suffix(grid, fix, index):
     _check_grid(grid)
+    # no prefix suffix for grid=markdown
+    if grid == "markdown" and index == 1:
+        return ""
     return change_based_on_is_grid_index(grid, fix, "", index)
 
 
@@ -123,9 +127,26 @@ def _get_row_grid_edge(grid, row_index, col_index, is_row_edge):
 
 
 styles = {
-    "full": {"grid": "full", "col_sep": COL, "row_sep": ROW},
-    "inner": {"grid": "inner", "col_sep": COL, "row_sep": ROW},
-    "default": {"grid": None, "col_sep": "  ", "row_sep": None},
+    "full": {
+        "grid": "full",
+        "col_sep": COL,
+        "row_sep": ROW
+    },
+    "inner": {
+        "grid": "inner",
+        "col_sep": COL,
+        "row_sep": ROW
+    },
+    "markdown": {
+        "grid": "markdown",
+        "col_sep": '|',
+        "row_sep": None
+    },
+    "default": {
+        "grid": None,
+        "col_sep": "  ",
+        "row_sep": None
+    },
 }
 
 
@@ -145,15 +166,20 @@ def readable(
     """return the printable text of a list of dict"""
     if not grid:
         col_sep = row_sep = ""
+    elif grid == 'markdown':
+        col_sep = '|'
+        row_sep = '-'
 
     headers = headers or list(data[0].keys())
 
     max_width_list = [0] * len(headers)
     max_value_dict = {k: 0 for k in headers}
 
-    axis_scale_func = {"linal": lambda x: x, "ln": math.log, "log10": math.log10}[
-        bar_scale
-    ]
+    axis_scale_func = {
+        "linal": lambda x: x,
+        "ln": math.log,
+        "log10": math.log10
+    }[bar_scale]
 
     def _set_max_width(r):
         for i, x in enumerate(r):
@@ -170,9 +196,8 @@ def readable(
         # convert numerics to bar graph
         if text and key and key in bars:
             return bar_char * int(
-                axis_scale_func(float(text))
-                / axis_scale_func(max_value_dict[key])
-                * bar_width
+                axis_scale_func(float(text)) /
+                axis_scale_func(max_value_dict[key]) * bar_width
             )
 
         # parse to string
@@ -194,13 +219,11 @@ def readable(
         _set_max_width(r)
 
     # add row lines as data type
-    if grid and row_sep:
-        grid_row = tuple(
-            row_sep * (w + len(prefix) + len(suffix)) for w in max_width_list
-        )
+    if grid and (row_sep or grid == 'markdown'):
+        cal_cell_width = lambda w: w + len(prefix) + len(suffix)
+        grid_row = tuple(row_sep * cal_cell_width(w) for w in max_width_list)
 
         final_rows = []
-
         for i, r in enumerate(rows):
             if grid == "inner":
                 final_rows.append(r)
@@ -211,6 +234,12 @@ def readable(
                 final_rows.append(r)
                 if i == len(rows) - 1:
                     final_rows.append(grid_row)
+            elif grid == "markdown":
+                if i == 1:
+                    final_rows.append(grid_row)
+                    final_rows.append(r)
+                else:
+                    final_rows.append(r)
     else:
         final_rows = rows
 
@@ -220,7 +249,9 @@ def readable(
     def fn(i, r):
         return "{}{}{}".format(
             _get_row_grid_edge(grid, i, 0, i in [0, len(final_rows) - 1]),
-            _get_row_sep(grid, col_sep, i, is_edge=i in [0, len(final_rows) - 1]).join(
+            _get_row_sep(
+                grid, col_sep, i, is_edge=i in [0, len(final_rows) - 1]
+            ).join(
                 table_print_row(
                     r,
                     max_width_list,
@@ -259,11 +290,13 @@ def main():
     parser.add_argument(
         "--sep-col", default=COL, help="the sepatrator of columns, e.g. │"
     )
-    parser.add_argument("--sep-row", default=ROW, help="the sepatrator of rows, e.g. ─")
+    parser.add_argument(
+        "--sep-row", default=ROW, help="the sepatrator of rows, e.g. ─"
+    )
     parser.add_argument(
         "--grid",
         default=os.getenv("PRINTABLE_GRID", None),
-        choices=["inner", "full"],
+        choices=["inner", "full", "markdown"],
         help="whether print the grid",
     )
     parser.add_argument(
@@ -293,7 +326,11 @@ def main():
         "-c", "--bar-char", default="o", help="the basic char of bar graph"
     )
     parser.add_argument(
-        "-w", "--bar-width", default=100, type=int, help="the width of bar graph"
+        "-w",
+        "--bar-width",
+        default=100,
+        type=int,
+        help="the width of bar graph"
     )
     parser.add_argument(
         "-s",
@@ -304,10 +341,15 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.grid == 'markdown':
+        args.less = False
+
     try:
-        data = {"json": read_json, "csv": read_csv, "yaml": write_yaml}[args.type](
-            args.file
-        )
+        data = {
+            "json": read_json,
+            "csv": read_csv,
+            "yaml": read_yaml
+        }[args.type](args.file)
         if DEBUG:
             print(data)
 
@@ -328,5 +370,4 @@ def main():
     except Exception as e:
         if DEBUG:
             raise
-        print(e)
         sys.exit(1)
