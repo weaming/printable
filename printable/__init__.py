@@ -158,7 +158,7 @@ def readable(
     row_sep=None,
     prefix=" ",
     suffix=" ",
-    bars: list = None,
+    bars: list = [],
     bar_char="x",
     bar_width=100,
     bar_scale="linal",
