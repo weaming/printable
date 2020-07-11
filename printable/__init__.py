@@ -59,7 +59,8 @@ def table_print_row(lst, max_width_list, prefix=" ", suffix=" "):
     return [
         "{}{}{}{}".format(
             prefix, v, " " * (max_width_list[i] - get_text_width(v)), suffix
-        ) for i, v in enumerate(lst)
+        )
+        for i, v in enumerate(lst)
     ]
 
 
@@ -80,9 +81,7 @@ def _check_grid(grid):
         "inner",
         "full",
         "markdown",
-    ), 'grid must be in [None, "inner", "full", "markdown"], got {}'.format(
-        grid
-    )
+    ), 'grid must be in [None, "inner", "full", "markdown"], got {}'.format(grid)
 
 
 def _get_cell_prefix_or_suffix(grid, fix, index):
@@ -127,26 +126,10 @@ def _get_row_grid_edge(grid, row_index, col_index, is_row_edge):
 
 
 styles = {
-    "full": {
-        "grid": "full",
-        "col_sep": COL,
-        "row_sep": ROW
-    },
-    "inner": {
-        "grid": "inner",
-        "col_sep": COL,
-        "row_sep": ROW
-    },
-    "markdown": {
-        "grid": "markdown",
-        "col_sep": '|',
-        "row_sep": None
-    },
-    "default": {
-        "grid": None,
-        "col_sep": "  ",
-        "row_sep": None
-    },
+    "full": {"grid": "full", "col_sep": COL, "row_sep": ROW},
+    "inner": {"grid": "inner", "col_sep": COL, "row_sep": ROW},
+    "markdown": {"grid": "markdown", "col_sep": '|', "row_sep": None},
+    "default": {"grid": None, "col_sep": "  ", "row_sep": None},
 }
 
 
@@ -162,6 +145,7 @@ def readable(
     bar_char="x",
     bar_width=100,
     bar_scale="linal",
+    limit=None,
 ):
     """return the printable text of a list of dict"""
     if not grid:
@@ -170,16 +154,17 @@ def readable(
         col_sep = '|'
         row_sep = '-'
 
+    if limit is not None:
+        data = data[:limit]
+
     headers = headers or list(data[0].keys())
 
     max_width_list = [0] * len(headers)
     max_value_dict = {k: 0 for k in headers}
 
-    axis_scale_func = {
-        "linal": lambda x: x,
-        "ln": math.log,
-        "log10": math.log10
-    }[bar_scale]
+    axis_scale_func = {"linal": lambda x: x, "ln": math.log, "log10": math.log10}[
+        bar_scale
+    ]
 
     def _set_max_width(r):
         for i, x in enumerate(r):
@@ -196,8 +181,9 @@ def readable(
         # convert numerics to bar graph
         if text and key and key in bars:
             return bar_char * int(
-                axis_scale_func(float(text)) /
-                axis_scale_func(max_value_dict[key]) * bar_width
+                axis_scale_func(float(text))
+                / axis_scale_func(max_value_dict[key])
+                * bar_width
             )
 
         # parse to string
@@ -249,9 +235,7 @@ def readable(
     def fn(i, r):
         return "{}{}{}".format(
             _get_row_grid_edge(grid, i, 0, i in [0, len(final_rows) - 1]),
-            _get_row_sep(
-                grid, col_sep, i, is_edge=i in [0, len(final_rows) - 1]
-            ).join(
+            _get_row_sep(grid, col_sep, i, is_edge=i in [0, len(final_rows) - 1]).join(
                 table_print_row(
                     r,
                     max_width_list,
@@ -290,9 +274,7 @@ def main():
     parser.add_argument(
         "--sep-col", default=COL, help="the sepatrator of columns, e.g. │"
     )
-    parser.add_argument(
-        "--sep-row", default=ROW, help="the sepatrator of rows, e.g. ─"
-    )
+    parser.add_argument("--sep-row", default=ROW, help="the sepatrator of rows, e.g. ─")
     parser.add_argument(
         "--grid",
         default=os.getenv("PRINTABLE_GRID", None),
@@ -326,11 +308,7 @@ def main():
         "-c", "--bar-char", default="o", help="the basic char of bar graph"
     )
     parser.add_argument(
-        "-w",
-        "--bar-width",
-        default=100,
-        type=int,
-        help="the width of bar graph"
+        "-w", "--bar-width", default=100, type=int, help="the width of bar graph"
     )
     parser.add_argument(
         "-s",
@@ -339,17 +317,16 @@ def main():
         help="the scale of axis in bar graph",
         choices=["linal", "ln", "log10"],
     )
+    parser.add_argument("-l", "--limit", type=int, help="the number of records to use")
     args = parser.parse_args()
 
     if args.grid == 'markdown':
         args.less = False
 
     try:
-        data = {
-            "json": read_json,
-            "csv": read_csv,
-            "yaml": read_yaml
-        }[args.type](args.file)
+        data = {"json": read_json, "csv": read_csv, "yaml": read_yaml}[args.type](
+            args.file
+        )
         if DEBUG:
             print(data)
 
@@ -362,6 +339,7 @@ def main():
             bar_char=args.bar_char,
             bar_width=args.bar_width,
             bar_scale=args.bar_scale,
+            limit=args.limit,
         )
         if args.less:
             write_to_less(output, line_numbers=args.line_numbers)
