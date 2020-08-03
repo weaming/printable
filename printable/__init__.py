@@ -36,7 +36,7 @@ RIGHT_BOTTOM = GRID_BOT[2]
 
 DEBUG = os.getenv("DEBUG")
 
-single_width_str = string.ascii_letters + string.digits + string.punctuation + " "
+single_width_str = string.ascii_letters + string.digits + string.punctuation + " ·"
 
 
 def _width(x):
