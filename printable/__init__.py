@@ -12,7 +12,7 @@ import os
 import math
 
 from data_process.io_json import read_json
-from data_process.io_csv import read_csv
+from data_process.io_csv import new_csv_reader
 from data_process.io_yaml import read_yaml
 
 GRID_TOP = "┌┬┐"
@@ -133,6 +133,17 @@ styles = {
 }
 
 
+def read_csv(path):
+    with new_csv_reader(
+        path,
+        csv_format=dict(
+            delimiter=os.getenv('CSV_DELIMITER', ','),
+            quotechar=os.getenv('CSV_QUOTE', '"'),
+        ),
+    ) as reader:
+        return list(reader)
+
+
 def readable(
     data: dict,
     headers=None,
@@ -162,9 +173,7 @@ def readable(
     max_width_list = [0] * len(headers)
     max_value_dict = {k: 0 for k in headers}
 
-    axis_scale_func = {"linal": lambda x: x, "ln": math.log, "log10": math.log10}[
-        bar_scale
-    ]
+    axis_scale_func = {"linal": lambda x: x, "ln": math.log, "log10": math.log10}[bar_scale]
 
     def _set_max_width(r):
         for i, x in enumerate(r):
@@ -268,12 +277,8 @@ def write_to_less(text, line_numbers):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-f", "--file", default="/dev/stdin", help="the path of JSON file"
-    )
-    parser.add_argument(
-        "--sep-col", default=COL, help="the sepatrator of columns, e.g. │"
-    )
+    parser.add_argument("-f", "--file", default="/dev/stdin", help="the path of JSON file")
+    parser.add_argument("--sep-col", default=COL, help="the sepatrator of columns, e.g. │")
     parser.add_argument("--sep-row", default=ROW, help="the sepatrator of rows, e.g. ─")
     parser.add_argument(
         "--grid",
@@ -301,15 +306,9 @@ def main():
         choices=["json", "csv", "yaml"],
         help="the file format",
     )
-    parser.add_argument(
-        "-b", "--bar", nargs="*", help="convert numeric fields to bar graphs"
-    )
-    parser.add_argument(
-        "-c", "--bar-char", default="o", help="the basic char of bar graph"
-    )
-    parser.add_argument(
-        "-w", "--bar-width", default=100, type=int, help="the width of bar graph"
-    )
+    parser.add_argument("-b", "--bar", nargs="*", help="convert numeric fields to bar graphs")
+    parser.add_argument("-c", "--bar-char", default="o", help="the basic char of bar graph")
+    parser.add_argument("-w", "--bar-width", default=100, type=int, help="the width of bar graph")
     parser.add_argument(
         "-s",
         "--bar-scale",
@@ -324,9 +323,7 @@ def main():
         args.less = False
 
     try:
-        data = {"json": read_json, "csv": read_csv, "yaml": read_yaml}[args.type](
-            args.file
-        )
+        data = {"json": read_json, "csv": read_csv, "yaml": read_yaml}[args.type](args.file)
         if DEBUG:
             print(data)
 

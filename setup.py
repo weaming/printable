@@ -27,7 +27,7 @@ gh_repo = "https://github.com/weaming/{}".format(name)
 
 setup(
     name=name,  # Required
-    version="0.3.5",  # Required
+    version="0.3.6",  # Required
     # This is a one-line description or tagline of what your project does.
     description="functions help for print tabular data",  # Required
     long_description=long_description,  # Optional
@@ -36,11 +36,7 @@ setup(
     # You can use `find_packages()` or the `py_modules` argument which expect a
     # single python file
     packages=find_packages(exclude=["contrib", "docs", "tests"]),  # Required
-    entry_points={
-        "console_scripts": [
-            "printable=printable:main"
-        ]
-    },  # Optional
+    entry_points={"console_scripts": ["printable=printable:main"]},  # Optional
     url=gh_repo,  # Optional
     author="weaming",  # Optional
     author_email="garden.yuen@gmail.com",  # Optional
