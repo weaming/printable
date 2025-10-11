@@ -1,7 +1,8 @@
 # Always prefer setuptools over distutils
-from setuptools import setup, find_packages
-from os import path
 from io import open
+from os import path
+
+from setuptools import find_packages, setup
 
 here = path.abspath(path.dirname(__file__))
 
@@ -16,18 +17,14 @@ def _read(fname):
 
 
 long_description = _read("README.md")
-install_requires = [
-    l
-    for l in _read("requirements.txt").split("\n")
-    if l.strip() and not l.strip().startswith("#")
-]
+install_requires = [l for l in _read("requirements.txt").split("\n") if l.strip() and not l.strip().startswith("#")]
 
 name = "printable"
 gh_repo = "https://github.com/weaming/{}".format(name)
 
 setup(
     name=name,  # Required
-    version="0.3.6",  # Required
+    version="0.3.7",  # Required
     # This is a one-line description or tagline of what your project does.
     description="functions help for print tabular data",  # Required
     long_description=long_description,  # Optional
