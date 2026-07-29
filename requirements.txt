@@ -1,1 +1,2 @@
 data-process==0.4.*
+wcwidth>=0.2.13

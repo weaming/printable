@@ -9,8 +9,9 @@ Functions help for printing tabular data.
 ## Usage Example
 
 ```python
-from printable import readable, styles
-print(readable(list_of_dict, **styles['full']))
+from printable import readable
+
+print(readable(list_of_dict, grid='full'))
 ```
 
 ```
