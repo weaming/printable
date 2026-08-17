@@ -14,6 +14,11 @@ from data_process.io_json import read_json
 from data_process.io_yaml import read_yaml
 from wcwidth import wcswidth
 
+from . import column as _column
+
+ColumnExecutionError = _column.ColumnExecutionError
+render_with_column = _column.render
+
 GRID_TOP, GRID_MID, GRID_BOT = '┌┬┐', '├┼┤', '└┴┘'
 ROW_CHAR, COL_CHAR = '─', '│'
 

@@ -1,0 +1,4 @@
+[submodule "util-linux"]
+	path = util-linux
+	url = https://github.com/util-linux/util-linux.git
+	branch = master
