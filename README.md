@@ -15,7 +15,7 @@ print(readable(list_of_dict, grid='full'))
 ```
 
 ```
-$ python -m printable -t csv -f sample.csv
+$ python -m printable -t csv -f samples/sample.csv
  symbol     desp      last    change   changeper  turnover  changesign  lastupdate
  HSI        恆指      26623   -468     1.73%      802億     -           2018/10/04 16:09
  HSCEI      國指      10547   -239     2.21%      257億     -           2018/10/04 16:08
@@ -23,7 +23,7 @@ $ python -m printable -t csv -f sample.csv
  000300.SH  滬深 300  3438    35       1.04%      949億     +           2018/09/28 15:10
  USDHKD     港匯      7.8337  -0.0037  -0.0472%             -
 
-$ python -m printable -t csv -f sample.csv --grid inner
+$ python -m printable -t csv -f samples/sample.csv --grid inner
  symbol    │ desp     │ last   │ change  │ changeper │ turnover │ changesign │ lastupdate
 ───────────┼──────────┼────────┼─────────┼───────────┼──────────┼────────────┼──────────────────
  HSI       │ 恆指     │ 26623  │ -468    │ 1.73%     │ 802億    │ -          │ 2018/10/04 16:09
@@ -36,7 +36,7 @@ $ python -m printable -t csv -f sample.csv --grid inner
 ───────────┼──────────┼────────┼─────────┼───────────┼──────────┼────────────┼──────────────────
  USDHKD    │ 港匯     │ 7.8337 │ -0.0037 │ -0.0472%  │          │ -          │
 
-$ python -m printable -t csv -f sample.csv --grid full
+$ python -m printable -t csv -f samples/sample.csv --grid full
 ┌───────────┬──────────┬────────┬─────────┬───────────┬──────────┬────────────┬──────────────────┐
 │ symbol    │ desp     │ last   │ change  │ changeper │ turnover │ changesign │ lastupdate       │
 ├───────────┼──────────┼────────┼─────────┼───────────┼──────────┼────────────┼──────────────────┤
@@ -51,7 +51,7 @@ $ python -m printable -t csv -f sample.csv --grid full
 │ USDHKD    │ 港匯     │ 7.8337 │ -0.0037 │ -0.0472%  │          │ -          │                  │
 └───────────┴──────────┴────────┴─────────┴───────────┴──────────┴────────────┴──────────────────┘
 
-$ python -m printable -t csv -f sample.csv --grid markdown
+$ python -m printable -t csv -f samples/sample.csv --grid markdown
 | symbol    | desp     | last   | change  | changeper | turnover | changesign | lastupdate       |
 |-----------|----------|--------|---------|-----------|----------|------------|------------------|
 | HSI       | 恆指     | 26623  | -468    | 1.73%     | 802億    | -          | 2018/10/04 16:09 |

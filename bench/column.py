@@ -2,9 +2,15 @@ import argparse
 import gc
 import math
 import statistics
+import sys
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from printable import readable, render_with_column
 
@@ -20,10 +26,10 @@ class BenchmarkResult:
 
 def build_rows(row_count: int, column_count: int) -> list[list[str]]:
     """生成两种渲染器共用的表格数据。"""
-    headers = [f'column-{column_index}' for column_index in range(column_count)]
+    headers = [f'列-{column_index} / column-{column_index}' for column_index in range(column_count)]
     rows = [headers]
     rows.extend(
-        [f'value-{row_index}-{column_index}' for column_index in range(column_count)]
+        [f'值-{row_index}-{column_index} / value-{row_index}-{column_index}' for column_index in range(column_count)]
         for row_index in range(row_count)
     )
     return rows
@@ -102,7 +108,7 @@ def main() -> None:
         args.repeat,
     )
 
-    print(f'rows={args.rows} columns={args.columns} repeat={args.repeat}')
+    print(f'rows={args.rows} columns={args.columns} repeat={args.repeat} charset=mixed-zh-en')
     print_result('python-readable', python_result)
     print_result('c-column', native_result)
     print(f'speedup={python_result.median_seconds / native_result.median_seconds:.2f}x')

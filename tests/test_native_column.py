@@ -1,9 +1,72 @@
 import unittest
+from types import SimpleNamespace
 
-from printable import ColumnExecutionError, render_with_column
+from printable import ColumnExecutionError, readable, render_with_column, render_with_engine
 
 
 class NativeColumnTest(unittest.TestCase):
+    def test_column_engine_matches_python_default_output(self):
+        rows = [
+            {'name': 'alpha', 'value': 1},
+            {'name': 'beta', 'value': 22},
+            {'name': '', 'value': ''},
+        ]
+        engine_args = SimpleNamespace(
+            engine='column',
+            grid=None,
+            sep_col=None,
+            sep_row=None,
+            bar=[],
+            bar_char='o',
+            bar_width=100,
+            bar_scale='linal',
+            limit=None,
+        )
+
+        for separator in (None, '|'):
+            engine_args.sep_col = separator
+            try:
+                output = '\n'.join(render_with_engine(rows, engine_args))
+            except FileNotFoundError as error:
+                self.skipTest(str(error))
+
+            self.assertEqual(output, readable(rows, col_sep=separator))
+
+    def test_missing_engine_automatically_uses_column(self):
+        engine_args = SimpleNamespace(
+            grid=None,
+            sep_col=None,
+            sep_row=None,
+            bar=[],
+            bar_char='o',
+            bar_width=100,
+            bar_scale='linal',
+            limit=None,
+        )
+
+        try:
+            output = '\n'.join(render_with_engine([['name'], ['alpha']], engine_args))
+        except FileNotFoundError as error:
+            self.skipTest(str(error))
+
+        self.assertEqual(output, readable([['name'], ['alpha']]))
+
+    def test_column_engine_rejects_grid_styles(self):
+        engine_args = SimpleNamespace(
+            engine='column',
+            grid='full',
+            sep_col=None,
+            sep_row=None,
+            bar=[],
+            bar_char='o',
+            bar_width=100,
+            bar_scale='linal',
+            limit=None,
+        )
+
+        with self.assertRaisesRegex(ValueError, '不能与 --grid 同时使用'):
+            render_with_engine([['name'], ['alpha']], engine_args)
+
     def test_renders_with_structured_options(self):
         try:
             output = render_with_column(

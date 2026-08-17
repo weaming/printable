@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 import unicodedata
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 
 from data_process.io_json import read_json
 from data_process.io_yaml import read_yaml
@@ -277,6 +277,78 @@ def readable(*args, **kwargs):
     return '\n'.join(iter_readable(*args, **kwargs))
 
 
+def render_column_data(data: Iterable, args: argparse.Namespace) -> str:
+    """使用 column 渲染默认表格，并保持 Python 默认边距。"""
+    headers, records = normalize_table(data, limit=args.limit)
+    if not headers:
+        return ''
+
+    selected_bars = set(args.bar or [])
+    maximums = calculate_bar_maximums(records, headers, selected_bars, args.bar_scale)
+    formatted_records = [
+        format_record(record, headers, selected_bars, args.bar_char, args.bar_width, maximums, args.bar_scale)
+        for record in records
+    ]
+    rows = [headers, *formatted_records]
+    tsv_input = ''.join('\t'.join(row) + '\n' for row in rows)
+    column_options: dict[str, str | bool] = {
+        'output_width': 'unlimited',
+        'separator': '\t',
+        'table': True,
+        'table_empty_lines': True,
+    }
+    if args.sep_col:
+        column_options['output_separator'] = f' {args.sep_col} '
+
+    column_output = render_with_column(tsv_input, **column_options)
+    widths = [calc_text_width(header) for header in headers]
+    for row in formatted_records:
+        for index, value in enumerate(row):
+            widths[index] = max(widths[index], calc_text_width(value))
+
+    separator_width = calc_text_width(args.sep_col or '')
+    target_width = sum(widths) + (2 * len(widths)) + (separator_width * (len(widths) - 1))
+    normalized_lines = []
+    for line in column_output.splitlines():
+        normalized_line = f' {line} '
+        padding_width = max(0, target_width - calc_text_width(normalized_line))
+        normalized_lines.append(normalized_line + (' ' * padding_width))
+    return '\n'.join(normalized_lines)
+
+
+def render_with_engine(data: Iterable, args: argparse.Namespace) -> Iterator[str]:
+    """根据 CLI engine 选择 Python 或 column 渲染器。"""
+    engine = args.engine
+
+    def python_lines() -> Iterator[str]:
+        """使用原生 Python 渲染器逐行输出。"""
+        yield from iter_readable(
+            data,
+            col_sep=args.sep_col,
+            row_sep=args.sep_row,
+            grid=args.grid,
+            bars=args.bar or [],
+            bar_char=args.bar_char,
+            bar_width=args.bar_width,
+            bar_scale=args.bar_scale,
+            limit=args.limit,
+        )
+
+    if engine == 'python':
+        return python_lines()
+    if args.grid is not None:
+        if engine == 'auto':
+            return python_lines()
+        raise ValueError('column engine 只支持默认表格格式，不能与 --grid 同时使用')
+
+    if engine == 'auto':
+        try:
+            return iter(render_column_data(data, args).splitlines())
+        except FileNotFoundError:
+            return python_lines()
+    return iter(render_column_data(data, args).splitlines())
+
+
 def read_csv(path):
     """以 UTF-8 CSV 格式读取并校验表格数据。"""
     delimiter = os.getenv('CSV_DELIMITER', ',')
@@ -323,6 +395,13 @@ def main():
         '--grid', default=os.getenv('PRINTABLE_GRID'), choices=['inner', 'full', 'markdown'], help='网格样式'
     )
     parser.add_argument('--less', action='store_true', help='使用less查看')
+    parser.add_argument(
+        '-e',
+        '--engine',
+        choices=['python', 'column', 'auto'],
+        default=os.getenv('PRINTABLE_ENGINE', 'auto'),
+        help='渲染引擎，默认 auto；无网格时优先使用 column',
+    )
     parser.add_argument('-N', '--line-numbers', action='store_false', default=True, help='显示行号')
     parser.add_argument('-t', '--type', default='json', choices=['json', 'csv', 'yaml'], help='文件格式')
     parser.add_argument('-b', '--bar', nargs='*', help='数值字段转换为条形图')
@@ -338,17 +417,7 @@ def main():
     try:
         readers = {'json': read_json, 'csv': read_csv, 'yaml': read_yaml}
         data = readers[args.type](args.file)
-        lines = iter_readable(
-            data,
-            col_sep=args.sep_col,
-            row_sep=args.sep_row,
-            grid=args.grid,
-            bars=args.bar or [],
-            bar_char=args.bar_char,
-            bar_width=args.bar_width,
-            bar_scale=args.bar_scale,
-            limit=args.limit,
-        )
+        lines = render_with_engine(data, args)
         if args.less:
             write_to_pager(lines, args.line_numbers)
         else:
