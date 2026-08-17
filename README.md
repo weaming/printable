@@ -6,6 +6,12 @@ Functions help for printing tabular data.
 
 `pip3 install printable`
 
+## Rendering Engines
+
+Two engines render tables: `python` (pure Python) and `column` (a ctypes binding of the compiled util-linux column command). By default (`auto`), the column engine is used when no `--grid` is set, and falls back to the python engine if the shared library is missing; grid styles always use the python engine. Select explicitly with `-e python|column|auto`.
+
+The column engine is ~20x faster: 16 ms vs 330 ms for 5000×6 mixed zh-en rows (`make bench`).
+
 ## Usage Example
 
 ```python
@@ -15,7 +21,7 @@ print(readable(list_of_dict, grid='full'))
 ```
 
 ```
-$ python -m printable -t csv -f samples/sample.csv
+$ printable -t csv -f samples/sample.csv
  symbol     desp      last    change   changeper  turnover  changesign  lastupdate
  HSI        恆指      26623   -468     1.73%      802億     -           2018/10/04 16:09
  HSCEI      國指      10547   -239     2.21%      257億     -           2018/10/04 16:08
@@ -23,7 +29,7 @@ $ python -m printable -t csv -f samples/sample.csv
  000300.SH  滬深 300  3438    35       1.04%      949億     +           2018/09/28 15:10
  USDHKD     港匯      7.8337  -0.0037  -0.0472%             -
 
-$ python -m printable -t csv -f samples/sample.csv --grid inner
+$ printable -t csv -f samples/sample.csv --grid inner
  symbol    │ desp     │ last   │ change  │ changeper │ turnover │ changesign │ lastupdate
 ───────────┼──────────┼────────┼─────────┼───────────┼──────────┼────────────┼──────────────────
  HSI       │ 恆指     │ 26623  │ -468    │ 1.73%     │ 802億    │ -          │ 2018/10/04 16:09
@@ -36,7 +42,7 @@ $ python -m printable -t csv -f samples/sample.csv --grid inner
 ───────────┼──────────┼────────┼─────────┼───────────┼──────────┼────────────┼──────────────────
  USDHKD    │ 港匯     │ 7.8337 │ -0.0037 │ -0.0472%  │          │ -          │
 
-$ python -m printable -t csv -f samples/sample.csv --grid full
+$ printable -t csv -f samples/sample.csv --grid full
 ┌───────────┬──────────┬────────┬─────────┬───────────┬──────────┬────────────┬──────────────────┐
 │ symbol    │ desp     │ last   │ change  │ changeper │ turnover │ changesign │ lastupdate       │
 ├───────────┼──────────┼────────┼─────────┼───────────┼──────────┼────────────┼──────────────────┤
@@ -51,7 +57,7 @@ $ python -m printable -t csv -f samples/sample.csv --grid full
 │ USDHKD    │ 港匯     │ 7.8337 │ -0.0037 │ -0.0472%  │          │ -          │                  │
 └───────────┴──────────┴────────┴─────────┴───────────┴──────────┴────────────┴──────────────────┘
 
-$ python -m printable -t csv -f samples/sample.csv --grid markdown
+$ printable -t csv -f samples/sample.csv --grid markdown
 | symbol    | desp     | last   | change  | changeper | turnover | changesign | lastupdate       |
 |-----------|----------|--------|---------|-----------|----------|------------|------------------|
 | HSI       | 恆指     | 26623  | -468    | 1.73%     | 802億    | -          | 2018/10/04 16:09 |
