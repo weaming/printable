@@ -6,14 +6,14 @@ function fail
 end
 
 if test (count $argv) -lt 1
-    fail '用法: native/build.fish macos|linux [arm64|x86_64]'
+    fail '用法: printable/native/build.fish macos|linux [arm64|x86_64]'
 end
 
 set -l target (string lower -- $argv[1])
 set -l architecture $argv[2]
 set -l script_directory (dirname (status filename))
-set -l project_root (cd "$script_directory/.."; and pwd)
-set -l native_directory "$project_root/native"
+set -l project_root (cd "$script_directory/../.."; and pwd)
+set -l native_directory "$project_root/printable/native"
 set -l util_linux_directory "$project_root/util-linux"
 
 if not contains -- $target macos linux
@@ -53,6 +53,7 @@ if test "$target" = macos
     set wrapper_link_flags \
         -dynamiclib \
         -Wl,-dead_strip \
+        -Wl,-install_name,@rpath/libcolumn.dylib \
         -Wl,-exported_symbol,_column_render \
         -Wl,-exported_symbol,_column_result_free
     set library_suffix dylib

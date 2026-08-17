@@ -1,38 +1,36 @@
-# Always prefer setuptools over distutils
-from io import open
-from os import path
+from pathlib import Path
 
 from setuptools import find_packages, setup
 
-here = path.abspath(path.dirname(__file__))
+here = Path(__file__).parent
 
 
-def _read(fname):
-    if path.isfile(fname):
-        with open(path.join(here, fname), encoding='utf-8') as f:
-            return f.read()
-    else:
-        print('warning: file {} does not exist'.format(fname))
-        return ''
+long_description = (here / 'README.md').read_text(encoding='utf-8')
 
-
-long_description = _read('README.md')
-install_requires = [l for l in _read('requirements.txt').split('\n') if l.strip() and not l.strip().startswith('#')]
+install_requires = [
+    line
+    for line in (here / 'requirements.txt').read_text(encoding='utf-8').splitlines()
+    if line.strip() and not line.strip().startswith('#')
+]
 
 name = 'printable'
-gh_repo = 'https://github.com/weaming/{}'.format(name)
+gh_repo = f'https://github.com/weaming/{name}'
 
 setup(
     name=name,  # Required
-    version='0.3.9',  # Required
+    version='0.4.0',  # Required
     # This is a one-line description or tagline of what your project does.
-    description='functions help for print tabular data',  # Required
+    description='CLI and functions help for printing tabular data',  # Required
     long_description=long_description,  # Optional
     long_description_content_type='text/markdown',  # Optional
     install_requires=install_requires,
     # You can use `find_packages()` or the `py_modules` argument which expect a
     # single python file
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),  # Required
+    package_data={
+        'printable.native': ['lib/*/libcolumn.dylib', 'lib/*/libcolumn.so'],
+    },
+    include_package_data=True,
     entry_points={'console_scripts': ['printable=printable:main']},  # Optional
     url=gh_repo,  # Optional
     author='weaming',  # Optional

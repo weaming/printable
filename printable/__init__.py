@@ -318,7 +318,7 @@ def render_column_data(data: Iterable, args: argparse.Namespace) -> str:
 
 def render_with_engine(data: Iterable, args: argparse.Namespace) -> Iterator[str]:
     """根据 CLI engine 选择 Python 或 column 渲染器。"""
-    engine = args.engine
+    engine = getattr(args, 'engine', 'auto')
 
     def python_lines() -> Iterator[str]:
         """使用原生 Python 渲染器逐行输出。"""

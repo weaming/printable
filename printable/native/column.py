@@ -82,16 +82,21 @@ def _load_library() -> ctypes.CDLL:
     """加载本地 column 动态库并配置 ctypes 签名。"""
     library_override = os.getenv('COLUMN_LIBRARY')
     if library_override:
-        library_path = Path(library_override)
+        library_paths = (Path(library_override),)
     else:
         library_suffix = '.dylib' if sys.platform == 'darwin' else '.so'
-        library_root = Path(__file__).resolve().parents[1] / 'build' / 'native' / _target_name()
-        library_path = library_root / f'libcolumn{library_suffix}'
+        library_name = f'libcolumn{library_suffix}'
+        target_name = _target_name()
+        package_library = Path(__file__).resolve().parent / 'lib' / target_name / library_name
+        development_library = Path(__file__).resolve().parents[2] / 'build' / 'native' / target_name / library_name
+        library_paths = (package_library, development_library)
+
+    library_path = next((path for path in library_paths if path.is_file()), library_paths[0])
 
     if not library_path.is_file():
         target_name = _target_name()
         target_arguments = target_name.replace('-', ' ')
-        build_command = f'native/build.fish {target_arguments}'
+        build_command = f'printable/native/build.fish {target_arguments}'
         raise FileNotFoundError(f'找不到 column 动态库: {library_path}，请先运行 {build_command}')
 
     library = ctypes.CDLL(str(library_path), use_errno=True)
