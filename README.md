@@ -12,7 +12,7 @@ Two engines render tables: `python` (pure Python) and `column` (a ctypes binding
 
 Width calculation uses the native library when available and falls back to pure Python otherwise. 5000×6 mixed zh-en rows (`make bench`):
 
-| engine            | width calc  | median (ms) | speedup (vs original) | speed up (vs now) |
+| engine            | width calc  | median (ms) | speedup (vs original) | speedup (vs now) |
 | ----------------- | ----------- | ----------: | --------------------: | ----------------: |
 | python (original) | pure Python |         322 |                  1.0x |                   |
 | python (now)      | pure Python |          75 |                  4.3x |              1.0x |
