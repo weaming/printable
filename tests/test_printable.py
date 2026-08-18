@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from printable import read_csv, readable
+from printable import detect_file_format, read_csv, readable
 
 
 class PrintableTest(unittest.TestCase):
@@ -12,6 +12,32 @@ class PrintableTest(unittest.TestCase):
             path = file.name
         try:
             self.assertEqual(read_csv(path), [{'name': 'A', 'note': 'one, two\r\nthree'}])
+        finally:
+            os.unlink(path)
+
+    def test_detect_file_format_by_extension_and_content(self):
+        cases = (
+            ('[{"a": 1}]', 'json'),
+            ('{\n  "a": 1\n}', 'json'),
+            ('name,value\nA,1\n', 'csv'),
+            ('name: A\nvalue: 1\n', 'yaml'),
+            ('- alpha\n- beta\n', 'yaml'),
+        )
+        for content, expected in cases:
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False) as file:
+                file.write(content)
+                path = file.name
+            try:
+                self.assertEqual(detect_file_format(path), expected, msg=repr(content))
+            finally:
+                os.unlink(path)
+
+    def test_detect_file_format_prefers_extension(self):
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.csv', delete=False) as file:
+            file.write('[{"a": 1}]')
+            path = file.name
+        try:
+            self.assertEqual(detect_file_format(path), 'csv')
         finally:
             os.unlink(path)
 

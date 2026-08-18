@@ -424,6 +424,29 @@ def render_with_engine(data: Iterable, args: argparse.Namespace) -> Iterator[str
     return iter(render_column_data(data, args).splitlines())
 
 
+def detect_file_format(path):
+    """按扩展名和内容嗅探文件格式，返回 json/csv/yaml。"""
+    extension_map = {'.json': 'json', '.csv': 'csv', '.yaml': 'yaml', '.yml': 'yaml'}
+    extension = os.path.splitext(path)[1].lower()
+    if extension in extension_map:
+        return extension_map[extension]
+
+    with open(path, encoding='utf-8-sig', errors='replace') as file:
+        head = file.read(4096)
+    stripped = head.lstrip()
+    if not stripped:
+        return 'json'
+    if stripped[0] in '{[':
+        return 'json'
+    for line in head.splitlines()[:20]:
+        stripped_line = line.strip()
+        if re.match(r'^[\w.\-/]+:\s*\S', stripped_line) or (
+            stripped_line.startswith('- ') and ',' not in stripped_line
+        ):
+            return 'yaml'
+    return 'csv'
+
+
 def read_csv(path):
     """以 UTF-8 CSV 格式读取并校验表格数据。"""
     delimiter = os.getenv('CSV_DELIMITER', ',')
@@ -478,7 +501,7 @@ def main():
         help='渲染引擎，默认 auto；无网格时优先使用 column',
     )
     parser.add_argument('-N', '--line-numbers', action='store_false', default=True, help='显示行号')
-    parser.add_argument('-t', '--type', default='json', choices=['json', 'csv', 'yaml'], help='文件格式')
+    parser.add_argument('-t', '--type', default=None, choices=['json', 'csv', 'yaml'], help='文件格式，默认自动检测')
     parser.add_argument('-b', '--bar', nargs='*', help='数值字段转换为条形图')
     parser.add_argument('-c', '--bar-char', default='o', help='条形图字符')
     parser.add_argument('-w', '--bar-width', default=100, type=int, help='条形图宽度')
@@ -491,7 +514,8 @@ def main():
 
     try:
         readers = {'json': read_json, 'csv': read_csv, 'yaml': read_yaml}
-        data = readers[args.type](args.file)
+        file_type = args.type or detect_file_format(args.file)
+        data = readers[file_type](args.file)
         lines = render_with_engine(data, args)
         if args.less:
             write_to_pager(lines, args.line_numbers)
