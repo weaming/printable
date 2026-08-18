@@ -4,6 +4,7 @@ from typing import TypeAlias
 
 from .native.column import ColumnExecutionError as ColumnExecutionError
 from .native.column import render as render_native_column
+from .native.column import widths_of as widths_of
 
 InputFile: TypeAlias = str | os.PathLike[str]
 OptionScalar: TypeAlias = str | int | float | bool | None

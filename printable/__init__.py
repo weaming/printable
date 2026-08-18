@@ -7,7 +7,6 @@ import os
 import re
 import subprocess
 import sys
-import unicodedata
 from collections.abc import Iterable, Iterator, Mapping
 
 from data_process.io_json import read_json
@@ -18,6 +17,7 @@ from . import column as _column
 
 ColumnExecutionError = _column.ColumnExecutionError
 render_with_column = _column.render
+native_widths_of = _column.widths_of
 
 GRID_TOP, GRID_MID, GRID_BOT = '┌┬┐', '├┼┤', '└┴┘'
 ROW_CHAR, COL_CHAR = '─', '│'
@@ -30,6 +30,7 @@ GRID_STYLES = {
 }
 
 ANSI_ESCAPE_PATTERN = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
+CONTROL_PATTERN = re.compile(r'[\x00-\x1f\x7f-\x9f]')
 VALID_GRIDS = frozenset(GRID_STYLES)
 VALID_BAR_SCALES = frozenset(('linear', 'linal', 'ln', 'log10'))
 DEBUG = os.getenv('DEBUG')
@@ -38,20 +39,68 @@ DEBUG = os.getenv('DEBUG')
 def normalize_cell_value(value):
     """将任意单元格值转换为可安全输出的一行文本。"""
     text = '' if value is None else str(value)
-    return ''.join(' ' if unicodedata.category(char) == 'Cc' else char for char in text)
+    return CONTROL_PATTERN.sub(' ', text)
+
+
+def _python_text_width(text):
+    """用纯 Python wcwidth 计算显示宽度。"""
+    width = wcswidth(text)
+    return width if width >= 0 else len(text)
+
+
+# 默认渲染参数的终端宽度（全局常量，' ' 恒占 1 列，空串 0 列）
+PREFIX_WIDTH = 1
+SUFFIX_WIDTH = 1
+SEP_COL_WIDTH = 0
+
+
+def _raw_text_width(text):
+    """计算已归一化文本的显示宽度；native 库可用时走 C。"""
+    native_widths = native_widths_of([text])
+    if native_widths is not None:
+        return native_widths[0]
+    return _python_text_width(text)
 
 
 def calc_text_width(text):
-    """计算终端显示宽度，忽略 ANSI 控制序列。"""
+    """计算终端显示宽度，忽略 ANSI 控制序列；native 库可用时走 C。"""
     visible_text = ANSI_ESCAPE_PATTERN.sub('', normalize_cell_value(text))
-    width = wcswidth(visible_text)
-    return width if width >= 0 else len(visible_text)
+    return _raw_text_width(visible_text)
 
 
-def format_cell_value(text, cell_width, prefix=' ', suffix=' '):
+def _calc_widths(cells):
+    """批量计算已归一化文本的显示宽度；native 库可用时一次 C 调用。
+
+    输入须为 normalize_cell_value 处理过的文本（不含控制字符/ANSI 转义）。
+    """
+    native_widths = native_widths_of(cells)
+    if native_widths is not None:
+        return native_widths
+    return [_python_text_width(cell) for cell in cells]
+
+
+def _calculate_widths(rows):
+    """平铺计算多行单元格宽度，一次批量调用。
+
+    返回（列宽列表, 平铺宽度）；rows 须为已归一化的等宽行列表。
+    """
+    column_count = len(rows[0])
+    flat_cells = [cell for row in rows for cell in row]
+    flat_widths = _calc_widths(flat_cells)
+    widths = list(flat_widths[:column_count])
+    for row_index in range(1, len(rows)):
+        row_start = row_index * column_count
+        for column_index in range(column_count):
+            widths[column_index] = max(widths[column_index], flat_widths[row_start + column_index])
+    return widths, flat_widths
+
+
+def format_cell_value(text, cell_width, prefix=' ', suffix=' ', value_width=None):
     """格式化单个单元格并补齐显示宽度。"""
     normalized_text = normalize_cell_value(text)
-    padding_width = max(0, cell_width - calc_text_width(normalized_text))
+    if value_width is None:
+        value_width = _raw_text_width(normalized_text)
+    padding_width = max(0, cell_width - value_width)
     return f'{prefix}{normalized_text}{" " * padding_width}{suffix}'
 
 
@@ -179,16 +228,21 @@ def escape_markdown_row(row):
     return tuple(value.replace('|', '\\|') for value in row)
 
 
-def render_data_row(row, widths, col_sep, prefix, suffix, edges=None):
-    """渲染一行数据单元格。"""
-    cells = [format_cell_value(value, widths[index], prefix, suffix) for index, value in enumerate(row)]
+def render_data_row(row, widths, col_sep, prefix, suffix, edges=None, row_widths=None):
+    """渲染一行数据单元格；row_widths 已提供时跳过批量计算。"""
+    if row_widths is None:
+        row_widths = _calc_widths(row)
+    cells = [
+        format_cell_value(value, widths[index], prefix, suffix, value_width=row_widths[index])
+        for index, value in enumerate(row)
+    ]
     line = col_sep.join(cells)
     return f'{edges[0]}{line}{edges[1]}' if edges else line
 
 
-def render_separator(widths, row_sep, prefix, suffix, left='', junction='', right=''):
+def render_separator(widths, row_sep, prefix_suffix_width, left='', junction='', right=''):
     """渲染一行横向分隔线。"""
-    cell_widths = [width + calc_text_width(prefix) + calc_text_width(suffix) for width in widths]
+    cell_widths = [width + prefix_suffix_width for width in widths]
     return left + junction.join(row_sep * width for width in cell_widths) + right
 
 
@@ -220,56 +274,61 @@ def iter_readable(
 
     selected_bars = set(bars or [])
     maximums = calculate_bar_maximums(records, normalized_headers, selected_bars, bar_scale)
-    widths = [calc_text_width(header) for header in normalized_headers]
+
+    rendered_rows = [normalized_headers]
     for record in records:
         row = format_record(record, normalized_headers, selected_bars, bar_char, bar_width, maximums, bar_scale)
         if grid == 'markdown':
             row = escape_markdown_row(row)
-        for index, value in enumerate(row):
-            widths[index] = max(widths[index], calc_text_width(value))
+        rendered_rows.append(row)
+
+    column_count = len(normalized_headers)
+    widths, flat_widths = _calculate_widths(rendered_rows)
 
     style = GRID_STYLES[grid or 'default']
     effective_col_sep = style['col_sep'] if col_sep is None else col_sep
     effective_row_sep = style['row_sep'] if row_sep is None else row_sep
+    if (prefix, suffix) == (' ', ' '):
+        prefix_suffix_width = PREFIX_WIDTH + SUFFIX_WIDTH
+    else:
+        prefix_suffix_width = sum(_calc_widths([prefix, suffix]))
 
-    def formatted_rows():
-        """按最终网格格式逐条生成已格式化记录。"""
-        for record in records:
-            row = format_record(record, normalized_headers, selected_bars, bar_char, bar_width, maximums, bar_scale)
-            yield escape_markdown_row(row) if grid == 'markdown' else row
+    def row_widths(row_index):
+        row_start = row_index * column_count
+        return flat_widths[row_start:row_start + column_count]
 
     if grid == 'full':
-        yield render_separator(widths, effective_row_sep, prefix, suffix, *GRID_TOP)
-        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, (COL_CHAR, COL_CHAR))
+        yield render_separator(widths, effective_row_sep, prefix_suffix_width, *GRID_TOP)
+        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, (COL_CHAR, COL_CHAR), row_widths(0))
         if records:
-            yield render_separator(widths, effective_row_sep, prefix, suffix, *GRID_MID)
-        for index, row in enumerate(formatted_rows()):
-            yield render_data_row(row, widths, effective_col_sep, prefix, suffix, (COL_CHAR, COL_CHAR))
-            if index < len(records) - 1:
-                yield render_separator(widths, effective_row_sep, prefix, suffix, *GRID_MID)
-        yield render_separator(widths, effective_row_sep, prefix, suffix, *GRID_BOT)
+            yield render_separator(widths, effective_row_sep, prefix_suffix_width, *GRID_MID)
+        for row_index in range(1, len(rendered_rows)):
+            yield render_data_row(rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, (COL_CHAR, COL_CHAR), row_widths(row_index))
+            if row_index < len(rendered_rows) - 1:
+                yield render_separator(widths, effective_row_sep, prefix_suffix_width, *GRID_MID)
+        yield render_separator(widths, effective_row_sep, prefix_suffix_width, *GRID_BOT)
         return
 
     if grid == 'inner':
-        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix)
+        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, row_widths=row_widths(0))
         if records:
-            yield render_separator(widths, effective_row_sep, prefix, suffix, '', GRID_MID[1], '')
-        for index, row in enumerate(formatted_rows()):
-            yield render_data_row(row, widths, effective_col_sep, prefix, suffix)
-            if index < len(records) - 1:
-                yield render_separator(widths, effective_row_sep, prefix, suffix, '', GRID_MID[1], '')
+            yield render_separator(widths, effective_row_sep, prefix_suffix_width, '', GRID_MID[1], '')
+        for row_index in range(1, len(rendered_rows)):
+            yield render_data_row(rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, row_widths=row_widths(row_index))
+            if row_index < len(rendered_rows) - 1:
+                yield render_separator(widths, effective_row_sep, prefix_suffix_width, '', GRID_MID[1], '')
         return
 
     if grid == 'markdown':
-        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, ('|', '|'))
-        yield render_separator(widths, effective_row_sep, prefix, suffix, '|', '|', '|')
-        for row in formatted_rows():
-            yield render_data_row(row, widths, effective_col_sep, prefix, suffix, ('|', '|'))
+        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, ('|', '|'), row_widths(0))
+        yield render_separator(widths, effective_row_sep, prefix_suffix_width, '|', '|', '|')
+        for row_index in range(1, len(rendered_rows)):
+            yield render_data_row(rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, ('|', '|'), row_widths(row_index))
         return
 
-    yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix)
-    for row in formatted_rows():
-        yield render_data_row(row, widths, effective_col_sep, prefix, suffix)
+    yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, row_widths=row_widths(0))
+    for row_index in range(1, len(rendered_rows)):
+        yield render_data_row(rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, row_widths=row_widths(row_index))
 
 
 def readable(*args, **kwargs):
@@ -301,18 +360,16 @@ def render_column_data(data: Iterable, args: argparse.Namespace) -> str:
         column_options['output_separator'] = f' {args.sep_col} '
 
     column_output = render_with_column(tsv_input, **column_options)
-    widths = [calc_text_width(header) for header in headers]
-    for row in formatted_records:
-        for index, value in enumerate(row):
-            widths[index] = max(widths[index], calc_text_width(value))
+    widths, _ = _calculate_widths([headers, *formatted_records])
 
-    separator_width = calc_text_width(args.sep_col or '')
+    separator_text = args.sep_col or ''
+    separator_width = SEP_COL_WIDTH if separator_text == '' else _calc_widths([separator_text])[0]
     target_width = sum(widths) + (2 * len(widths)) + (separator_width * (len(widths) - 1))
+    padded_lines = [f' {line} ' for line in column_output.splitlines()]
     normalized_lines = []
-    for line in column_output.splitlines():
-        normalized_line = f' {line} '
-        padding_width = max(0, target_width - calc_text_width(normalized_line))
-        normalized_lines.append(normalized_line + (' ' * padding_width))
+    for line, line_width in zip(padded_lines, _calc_widths(padded_lines)):
+        padding_width = max(0, target_width - line_width)
+        normalized_lines.append(line + (' ' * padding_width))
     return '\n'.join(normalized_lines)
 
 

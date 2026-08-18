@@ -55,7 +55,8 @@ if test "$target" = macos
         -Wl,-dead_strip \
         -Wl,-install_name,@rpath/libcolumn.dylib \
         -Wl,-exported_symbol,_column_render \
-        -Wl,-exported_symbol,_column_result_free
+        -Wl,-exported_symbol,_column_result_free \
+        -Wl,-exported_symbol,_column_widths
     set library_suffix dylib
     set system_libraries -lncurses -lm
 

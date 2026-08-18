@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import printable
 from printable import readable, render_with_column
 
 
@@ -95,23 +96,38 @@ def print_result(name: str, result: BenchmarkResult) -> None:
     )
 
 
+def readable_without_native_widths(rows: Sequence[Sequence[str]]) -> str:
+    """以纯 Python 宽度计算渲染，临时禁用 native 宽度库。"""
+    saved_widths_of = printable.native_widths_of
+    printable.native_widths_of = lambda cells: None
+    try:
+        return readable(rows)
+    finally:
+        printable.native_widths_of = saved_widths_of
+
+
 def main() -> None:
-    """运行纯 Python 与 C wrapper 对比。"""
+    """对比纯 Python、C 宽度 + Python 渲染与 column 引擎。"""
     args = parse_args()
     rows = build_rows(args.rows, args.columns)
     tsv_input = serialize_tsv(rows)
 
-    python_result = measure(lambda: readable(rows), args.warmup, args.repeat)
-    native_result = measure(
+    python_width_result = measure(lambda: readable_without_native_widths(rows), args.warmup, args.repeat)
+    c_width_result = measure(lambda: readable(rows), args.warmup, args.repeat)
+    column_result = measure(
         lambda: render_with_column(tsv_input, table=True, separator='\t'),
         args.warmup,
         args.repeat,
     )
 
     print(f'rows={args.rows} columns={args.columns} repeat={args.repeat} charset=mixed-zh-en')
-    print_result('python-readable', python_result)
-    print_result('c-column', native_result)
-    print(f'speedup={python_result.median_seconds / native_result.median_seconds:.2f}x')
+    print_result('python', python_width_result)
+    print_result('python+c-width', c_width_result)
+    print_result('c-column', column_result)
+    print(
+        f'speedup vs python: c-width={python_width_result.median_seconds / c_width_result.median_seconds:.2f}x '
+        f'column={python_width_result.median_seconds / column_result.median_seconds:.2f}x'
+    )
 
 
 if __name__ == '__main__':

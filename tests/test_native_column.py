@@ -1,7 +1,18 @@
 import unittest
 from types import SimpleNamespace
 
-from printable import ColumnExecutionError, readable, render_with_column, render_with_engine
+from wcwidth import wcswidth
+
+from printable import (
+    ANSI_ESCAPE_PATTERN,
+    ColumnExecutionError,
+    calc_text_width,
+    native_widths_of,
+    normalize_cell_value,
+    readable,
+    render_with_column,
+    render_with_engine,
+)
 
 
 class NativeColumnTest(unittest.TestCase):
@@ -92,6 +103,26 @@ class NativeColumnTest(unittest.TestCase):
     def test_rejects_unknown_keyword(self):
         with self.assertRaises(TypeError):
             render_with_column('name\n', not_an_option=True)
+
+    def test_native_widths_match_python_wcwidth(self):
+        samples = ['abc', '中文', 'a中b', '👍', 'é', '', '\x1b[31m红\x1b[0m', 'a\tb']
+        visible = [ANSI_ESCAPE_PATTERN.sub('', normalize_cell_value(sample)) for sample in samples]
+        native_widths = native_widths_of(visible)
+        if native_widths is None:
+            self.skipTest('column 动态库不可用')
+
+        reference_widths = []
+        for text in visible:
+            width = wcswidth(text)
+            reference_widths.append(width if width >= 0 else len(text))
+        self.assertEqual(native_widths, reference_widths)
+
+    def test_calc_text_width_matches_reference(self):
+        samples = ['abc', '中文', '\x1b[31m红\x1b[0m', 'é', '', 'a\tb']
+        for sample in samples:
+            visible = ANSI_ESCAPE_PATTERN.sub('', normalize_cell_value(sample))
+            width = wcswidth(visible)
+            self.assertEqual(calc_text_width(sample), width if width >= 0 else len(visible))
 
 
 if __name__ == '__main__':

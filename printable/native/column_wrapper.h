@@ -38,4 +38,12 @@ COLUMN_API int column_render(
 
 COLUMN_API void column_result_free(struct column_result *result);
 
+/* input 是按 \x1f 分隔的 UTF-8 单元格序列；结果写入 widths（最多 widths_capacity 个），
+ * 返回单元格总数。参数非法时 errno = EINVAL 并返回 0。 */
+COLUMN_API size_t column_widths(
+	const char *input,
+	size_t input_size,
+	size_t *widths,
+	size_t widths_capacity);
+
 #endif

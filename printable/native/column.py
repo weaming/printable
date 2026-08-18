@@ -109,7 +109,45 @@ def _load_library() -> ctypes.CDLL:
     library.column_render.restype = ctypes.c_int
     library.column_result_free.argtypes = [ctypes.POINTER(_ColumnResult)]
     library.column_result_free.restype = None
+    library.column_widths.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_size_t,
+        ctypes.POINTER(ctypes.c_size_t),
+        ctypes.c_size_t,
+    ]
+    library.column_widths.restype = ctypes.c_size_t
     return library
+
+
+_CELL_SEPARATOR = '\x1f'
+
+_widths_library: ctypes.CDLL | bool | None = None
+
+
+def _get_widths_library() -> ctypes.CDLL | None:
+    """惰性加载 column 动态库；不可用时返回 None（不报错）。"""
+    global _widths_library
+    if _widths_library is None:
+        try:
+            _widths_library = _load_library()
+        except FileNotFoundError:
+            _widths_library = False
+    return _widths_library if _widths_library else None
+
+
+def widths_of(cells: Sequence[str]) -> list[int] | None:
+    """批量计算单元格的终端显示宽度；column 动态库不可用时返回 None。"""
+    library = _get_widths_library()
+    if library is None:
+        return None
+    if not cells:
+        return []
+    input_bytes = _CELL_SEPARATOR.join(cells).encode('utf-8', errors='replace')
+    widths_array = (ctypes.c_size_t * len(cells))()
+    cell_count = library.column_widths(input_bytes, len(input_bytes), widths_array, len(cells))
+    if cell_count != len(cells):
+        return None
+    return list(widths_array)
 
 
 def _normalize_options(

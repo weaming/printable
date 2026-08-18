@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <wchar.h>
 
 #if !defined(__APPLE__) && !defined(__linux__)
 #error "column wrapper supports macOS and Linux only"
@@ -29,12 +30,105 @@ static void column_exit(int status) __attribute__((noreturn));
 static void column_err(int status, const char *format, ...) __attribute__((noreturn));
 static void column_errx(int status, const char *format, ...) __attribute__((noreturn));
 
-#include "../util-linux/text-utils/column.c"
+#include "../../util-linux/text-utils/column.c"
 
 #undef main
 #undef exit
 #undef err
 #undef errx
+
+static size_t utf8_sequence_length(unsigned char first_byte)
+{
+	if (first_byte < 0x80)
+		return 1;
+	if ((first_byte & 0xE0) == 0xC0)
+		return 2;
+	if ((first_byte & 0xF0) == 0xE0)
+		return 3;
+	if ((first_byte & 0xF8) == 0xF0)
+		return 4;
+	return 1;
+}
+
+static wchar_t utf8_decode(const unsigned char *bytes, size_t size)
+{
+	if (size == 2)
+		return ((wchar_t)(bytes[0] & 0x1F) << 6) | (bytes[1] & 0x3F);
+	if (size == 3)
+		return ((wchar_t)(bytes[0] & 0x0F) << 12) |
+			((wchar_t)(bytes[1] & 0x3F) << 6) | (bytes[2] & 0x3F);
+	if (size == 4)
+		return ((wchar_t)(bytes[0] & 0x07) << 18) |
+			((wchar_t)(bytes[1] & 0x3F) << 12) |
+			((wchar_t)(bytes[2] & 0x3F) << 6) | (bytes[3] & 0x3F);
+	return bytes[0];
+}
+
+static size_t cell_width(const unsigned char *text, size_t text_size)
+{
+	size_t index = 0;
+	size_t width = 0;
+
+	while (index < text_size) {
+		unsigned char first_byte = text[index];
+		size_t sequence_size = utf8_sequence_length(first_byte);
+		wchar_t codepoint;
+		int column;
+
+		if (sequence_size > 1 && index + sequence_size > text_size)
+			sequence_size = text_size - index;
+		if (sequence_size > 1) {
+			int valid = 1;
+
+			for (size_t offset = 1; offset < sequence_size; offset++)
+				if ((text[index + offset] & 0xC0) != 0x80)
+					valid = 0;
+			if (!valid) {
+				width++;
+				index++;
+				continue;
+			}
+		}
+
+		codepoint = utf8_decode(text + index, sequence_size);
+		if (codepoint < 32 || (codepoint >= 0x7F && codepoint <= 0x9F))
+			width++;
+		else {
+			column = wcwidth(codepoint);
+			width += column >= 0 ? (size_t)column : sequence_size;
+		}
+		index += sequence_size;
+	}
+	return width;
+}
+
+size_t column_widths(
+	const char *input,
+	size_t input_size,
+	size_t *widths,
+	size_t widths_capacity)
+{
+	size_t cell_start = 0;
+	size_t cell_count = 0;
+	size_t index;
+
+	if (widths == NULL || widths_capacity == 0 || (input_size > 0 && input == NULL)) {
+		errno = EINVAL;
+		return 0;
+	}
+
+	for (index = 0; index <= input_size; index++) {
+		if (index == input_size || input[index] == 0x1F) {
+			if (cell_count < widths_capacity)
+				widths[cell_count] = cell_width(
+					(const unsigned char *)input + cell_start,
+					index - cell_start);
+			cell_count++;
+			cell_start = index + 1;
+		}
+	}
+	return cell_count;
+}
 
 static int duplicate_descriptor(int descriptor)
 {

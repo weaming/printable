@@ -1,6 +1,6 @@
 # Printable
 
-Functions help for printing tabular data.
+CLI and functions help for printing tabular data.
 
 ## Install
 
@@ -10,7 +10,16 @@ Functions help for printing tabular data.
 
 Two engines render tables: `python` (pure Python) and `column` (a ctypes binding of the compiled util-linux column command). By default (`auto`), the column engine is used when no `--grid` is set, and falls back to the python engine if the shared library is missing; grid styles always use the python engine. Select explicitly with `-e python|column|auto`.
 
-The column engine is ~20x faster: 16 ms vs 330 ms for 5000×6 mixed zh-en rows (`make bench`).
+Width calculation uses the native library when available and falls back to pure Python otherwise. 5000×6 mixed zh-en rows (`make bench`):
+
+| engine            | width calc  | median (ms) | speedup (vs original) | speed up (vs now) |
+| ----------------- | ----------- | ----------: | --------------------: | ----------------: |
+| python (original) | pure Python |         322 |                  1.0x |                   |
+| python (now)      | pure Python |          75 |                  4.3x |              1.0x |
+| python + C width  | native C    |          27 |                 11.9x |              2.8x |
+| column            | native C    |          17 |                 18.9x |              4.4x |
+
+The original row is the pre-optimization implementation (git `a5ce114`): per-cell `wcswidth`, per-character control normalization, and duplicated row formatting. Optimizations: batched width calculation via the native library, flattened single-call batch, and regex-based normalization.
 
 ## Usage Example
 
