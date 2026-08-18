@@ -2,6 +2,8 @@
 
 import argparse
 import csv
+import io
+import json
 import math
 import os
 import re
@@ -9,8 +11,7 @@ import subprocess
 import sys
 from collections.abc import Iterable, Iterator, Mapping
 
-from data_process.io_json import read_json
-from data_process.io_yaml import read_yaml
+import yaml
 from wcwidth import wcswidth
 
 from . import column as _column
@@ -18,6 +19,11 @@ from . import column as _column
 ColumnExecutionError = _column.ColumnExecutionError
 render_with_column = _column.render
 native_widths_of = _column.widths_of
+
+try:
+    from yaml import CLoader as YAML_LOADER
+except ImportError:
+    from yaml import Loader as YAML_LOADER
 
 GRID_TOP, GRID_MID, GRID_BOT = '┌┬┐', '├┼┤', '└┴┘'
 ROW_CHAR, COL_CHAR = '─', '│'
@@ -158,6 +164,8 @@ def normalize_table(data, headers=None, limit=None):
         raise ValueError('limit 不能小于 0')
     if isinstance(data, (str, bytes)) or not isinstance(data, Iterable):
         raise TypeError('data 必须是记录的可迭代对象')
+    if isinstance(data, Mapping):
+        data = [data]
 
     data_iterator = iter(data)
     try:
@@ -424,15 +432,17 @@ def render_with_engine(data: Iterable, args: argparse.Namespace) -> Iterator[str
     return iter(render_column_data(data, args).splitlines())
 
 
-def detect_file_format(path):
-    """按扩展名和内容嗅探文件格式，返回 json/csv/yaml。"""
+def detect_file_format(path, content=None):
+    """按扩展名和内容嗅探文件格式，返回 json/csv/yaml；content 为已读入的字节内容。"""
     extension_map = {'.json': 'json', '.csv': 'csv', '.yaml': 'yaml', '.yml': 'yaml'}
     extension = os.path.splitext(path)[1].lower()
     if extension in extension_map:
         return extension_map[extension]
 
-    with open(path, encoding='utf-8-sig', errors='replace') as file:
-        head = file.read(4096)
+    if content is None:
+        with open(path, 'rb') as file:
+            content = file.read(4096)
+    head = content[:4096].decode('utf-8-sig', errors='replace')
     stripped = head.lstrip()
     if not stripped:
         return 'json'
@@ -447,15 +457,35 @@ def detect_file_format(path):
     return 'csv'
 
 
-def read_csv(path):
-    """以 UTF-8 CSV 格式读取并校验表格数据。"""
+def read_json(path, content=None):
+    """读取 JSON 文件或字节内容，返回解析结果。"""
+    if content is None:
+        with open(path, 'rb') as file:
+            content = file.read()
+    return json.loads(content.decode('utf-8-sig'))
+
+
+def read_yaml(path, content=None):
+    """读取 YAML 文件或字节内容，返回解析结果。"""
+    if content is None:
+        with open(path, 'rb') as file:
+            content = file.read()
+    return yaml.load(content.decode('utf-8-sig'), Loader=YAML_LOADER)
+
+
+def read_csv(path, content=None):
+    """以 UTF-8 CSV 格式读取并校验表格数据；content 为已读入的字节内容。"""
     delimiter = os.getenv('CSV_DELIMITER', ',')
     quotechar = os.getenv('CSV_QUOTE', '"')
     encoding = os.getenv('CSV_ENCODING', 'utf-8-sig')
     if len(delimiter) != 1 or len(quotechar) != 1:
         raise ValueError('CSV_DELIMITER 和 CSV_QUOTE 必须是单个字符')
 
-    with open(path, encoding=encoding, newline='') as csv_file:
+    if content is None:
+        csv_file = open(path, encoding=encoding, newline='')
+    else:
+        csv_file = io.TextIOWrapper(io.BytesIO(content), encoding=encoding, newline='')
+    with csv_file:
         reader = csv.DictReader(csv_file, delimiter=delimiter, quotechar=quotechar)
         if reader.fieldnames is None:
             return []
@@ -514,8 +544,9 @@ def main():
 
     try:
         readers = {'json': read_json, 'csv': read_csv, 'yaml': read_yaml}
-        file_type = args.type or detect_file_format(args.file)
-        data = readers[file_type](args.file)
+        stdin_content = sys.stdin.buffer.read() if args.file == '/dev/stdin' else None
+        file_type = args.type or detect_file_format(args.file, stdin_content)
+        data = readers[file_type](args.file, stdin_content)
         lines = render_with_engine(data, args)
         if args.less:
             write_to_pager(lines, args.line_numbers)

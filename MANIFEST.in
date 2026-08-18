@@ -1,3 +1,0 @@
-include README.md
-include requirements.txt
-recursive-include printable/native/lib *.dylib *.so
