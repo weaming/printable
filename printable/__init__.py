@@ -29,6 +29,42 @@ GRID_STYLES = {
     'default': {'grid': None, 'col_sep': '', 'row_sep': None},
 }
 
+# 各网格的边框与分隔线配置（header_conditional：仅在有数据行时画表头下划线）
+GRID_LAYOUTS = {
+    'full': {
+        'edges': (COL_CHAR, COL_CHAR),
+        'top': GRID_TOP,
+        'header_line': GRID_MID,
+        'row_line': GRID_MID,
+        'bottom': GRID_BOT,
+        'header_conditional': True,
+    },
+    'inner': {
+        'edges': None,
+        'top': None,
+        'header_line': ('', GRID_MID[1], ''),
+        'row_line': ('', GRID_MID[1], ''),
+        'bottom': None,
+        'header_conditional': True,
+    },
+    'markdown': {
+        'edges': ('|', '|'),
+        'top': None,
+        'header_line': ('|', '|', '|'),
+        'row_line': None,
+        'bottom': None,
+        'header_conditional': False,
+    },
+    'default': {
+        'edges': None,
+        'top': None,
+        'header_line': None,
+        'row_line': None,
+        'bottom': None,
+        'header_conditional': False,
+    },
+}
+
 ANSI_ESCAPE_PATTERN = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
 CONTROL_PATTERN = re.compile(r'[\x00-\x1f\x7f-\x9f]')
 VALID_GRIDS = frozenset(GRID_STYLES)
@@ -295,40 +331,22 @@ def iter_readable(
 
     def row_widths(row_index):
         row_start = row_index * column_count
-        return flat_widths[row_start:row_start + column_count]
+        return flat_widths[row_start : row_start + column_count]
 
-    if grid == 'full':
-        yield render_separator(widths, effective_row_sep, prefix_suffix_width, *GRID_TOP)
-        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, (COL_CHAR, COL_CHAR), row_widths(0))
-        if records:
-            yield render_separator(widths, effective_row_sep, prefix_suffix_width, *GRID_MID)
-        for row_index in range(1, len(rendered_rows)):
-            yield render_data_row(rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, (COL_CHAR, COL_CHAR), row_widths(row_index))
-            if row_index < len(rendered_rows) - 1:
-                yield render_separator(widths, effective_row_sep, prefix_suffix_width, *GRID_MID)
-        yield render_separator(widths, effective_row_sep, prefix_suffix_width, *GRID_BOT)
-        return
-
-    if grid == 'inner':
-        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, row_widths=row_widths(0))
-        if records:
-            yield render_separator(widths, effective_row_sep, prefix_suffix_width, '', GRID_MID[1], '')
-        for row_index in range(1, len(rendered_rows)):
-            yield render_data_row(rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, row_widths=row_widths(row_index))
-            if row_index < len(rendered_rows) - 1:
-                yield render_separator(widths, effective_row_sep, prefix_suffix_width, '', GRID_MID[1], '')
-        return
-
-    if grid == 'markdown':
-        yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, ('|', '|'), row_widths(0))
-        yield render_separator(widths, effective_row_sep, prefix_suffix_width, '|', '|', '|')
-        for row_index in range(1, len(rendered_rows)):
-            yield render_data_row(rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, ('|', '|'), row_widths(row_index))
-        return
-
-    yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, row_widths=row_widths(0))
+    layout = GRID_LAYOUTS[grid or 'default']
+    if layout['top'] is not None:
+        yield render_separator(widths, effective_row_sep, prefix_suffix_width, *layout['top'])
+    yield render_data_row(normalized_headers, widths, effective_col_sep, prefix, suffix, layout['edges'], row_widths(0))
+    if layout['header_line'] is not None and (records or not layout['header_conditional']):
+        yield render_separator(widths, effective_row_sep, prefix_suffix_width, *layout['header_line'])
     for row_index in range(1, len(rendered_rows)):
-        yield render_data_row(rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, row_widths=row_widths(row_index))
+        yield render_data_row(
+            rendered_rows[row_index], widths, effective_col_sep, prefix, suffix, layout['edges'], row_widths(row_index)
+        )
+        if layout['row_line'] is not None and row_index < len(rendered_rows) - 1:
+            yield render_separator(widths, effective_row_sep, prefix_suffix_width, *layout['row_line'])
+    if layout['bottom'] is not None:
+        yield render_separator(widths, effective_row_sep, prefix_suffix_width, *layout['bottom'])
 
 
 def readable(*args, **kwargs):
